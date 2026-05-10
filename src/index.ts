@@ -5,6 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import http from "http";
 // ─── ICH Guideline data ────────────────────────────────────────────────────
 
 const ICH_GUIDELINES: Record<string, { title: string; scope: string; keyRequirements: string[]; url: string }> = {
@@ -419,8 +420,7 @@ async function main() {
   const server = createMcpServer();
     await server.connect(transport);
 
-  const httpServer = require("http").createServer(async (req: any, res: any) => {
-        const url = new URL(req.url || "/", "http://localhost");
+          const httpServer = http.createServer(async (req: any, res: any) => {
 
                                                       // Health check
                                                       if (req.method === "GET" && url.pathname === "/health") {

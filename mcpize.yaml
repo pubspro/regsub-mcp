@@ -1,0 +1,11 @@
+name: regsub-mcp
+runtime: typescript
+entry: src/index.ts
+
+server:
+  name: Regulatory Submission Intelligence
+  slug: regsub-mcp
+
+scaling:
+  min: 0
+  max: 10

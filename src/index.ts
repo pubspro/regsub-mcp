@@ -1,13 +1,10 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import http from "http";
-import { IncomingMessage, ServerResponse } from "http";
-
 // ─── ICH Guideline data ────────────────────────────────────────────────────
 
 const ICH_GUIDELINES: Record<string, { title: string; scope: string; keyRequirements: string[]; url: string }> = {
@@ -410,89 +407,57 @@ function createMcpServer(): Server {
   return server;
 }
 
-// ─── HTTP Server with SSE transport ──────────────────────────────────────
+// ——— HTTP Server with Streamable HTTP transport ————————————————
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
-const transports = new Map<string, SSEServerTransport>();
 
-const httpServer = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  const url = new URL(req.url || "/", "http://localhost");
-
-  // Health check
-  if (req.method === "GET" && url.pathname === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok", server: "regsub-mcp", version: "1.0.0" }));
-    return;
-  }
-
-  // SSE endpoint — client connects here to receive messages
-  if (req.method === "GET" && url.pathname === "/sse") {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-      "Access-Control-Allow-Origin": "*"
+async function main() {
+    const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
     });
 
-    const transport = new SSEServerTransport("/message", res);
-    const sessionId = transport.sessionId;
-    transports.set(sessionId, transport);
-
-    const server = createMcpServer();
+  const server = createMcpServer();
     await server.connect(transport);
 
-    req.on("close", () => {
-      transports.delete(sessionId);
+  const httpServer = require("http").createServer(async (req: any, res: any) => {
+        const url = new URL(req.url || "/", "http://localhost");
+
+                                                      // Health check
+                                                      if (req.method === "GET" && url.pathname === "/health") {
+                                                              res.writeHead(200, { "Content-Type": "application/json" });
+                                                              res.end(JSON.stringify({ status: "ok", server: "regsub-mcp", version: "1.0.0" }));
+                                                              return;
+                                                      }
+
+                                                      // MCP endpoint — handles GET (SSE stream), POST (messages), DELETE (session close)
+                                                      if (url.pathname === "/mcp") {
+                                                              await transport.handleRequest(req, res, await readBody(req));
+                                                              return;
+                                                      }
+
+                                                      res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Not found" }));
+  });
+
+  httpServer.listen(PORT, "0.0.0.0", () => {
+        console.log("Regulatory Submission Intelligence MCP server listening on port " + PORT);
+        console.log("MCP endpoint: http://0.0.0.0:" + PORT + "/mcp");
+        console.log("Health check: http://0.0.0.0:" + PORT + "/health");
+  });
+}
+
+function readBody(req: any): Promise<any> {
+    return new Promise((resolve) => {
+          let body = "";
+          req.on("data", (chunk: any) => { body += chunk; });
+          req.on("end", () => {
+                  try {
+                            resolve(body ? JSON.parse(body) : undefined);
+                  } catch {
+                            resolve(undefined);
+                  }
+          });
     });
-    return;
-  }
+}
 
-  // Message endpoint — client POSTs messages here
-  if (req.method === "POST" && url.pathname === "/message") {
-    const sessionId = url.searchParams.get("sessionId");
-    if (!sessionId) {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Missing sessionId" }));
-      return;
-    }
-
-    const transport = transports.get(sessionId);
-    if (!transport) {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Session not found" }));
-      return;
-    }
-
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", async () => {
-      try {
-        await transport.handlePostMessage(req, res, body ? JSON.parse(body) : {});
-      } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Internal error" }));
-      }
-    });
-    return;
-  }
-
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    });
-    res.end();
-    return;
-  }
-
-  res.writeHead(404, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "Not found" }));
-});
-
-httpServer.listen(PORT, "0.0.0.0", () => {
-  console.log("Regulatory Submission Intelligence MCP server listening on port " + PORT);
-  console.log("SSE endpoint: http://0.0.0.0:" + PORT + "/sse");
-  console.log("Health check: http://0.0.0.0:" + PORT + "/health");
-});
+main().catch(console.error);

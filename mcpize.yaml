@@ -1,11 +1,9 @@
-name: regsub-mcp
+# MCPize Configuration
+# Docs: https://mcpize.com/docs/mcpize-yaml
+
+version: 1
+
+name: "Regulatory Submission Intelligence"
+slug: "regsub-mcp"
+
 runtime: typescript
-entry: src/index.ts
-
-server:
-  name: Regulatory Submission Intelligence
-  slug: regsub-mcp
-
-scaling:
-  min: 0
-  max: 10

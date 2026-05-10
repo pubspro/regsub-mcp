@@ -409,6 +409,7 @@ function createMcpServer(): Server {
 }
 
 // ——— HTTP Server with Streamable HTTP transport ————————————————
+// ——— HTTP Server with Streamable HTTP transport ————————————————
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 
@@ -420,23 +421,23 @@ async function main() {
   const server = createMcpServer();
     await server.connect(transport);
 
-          const httpServer = http.createServer(async (req: any, res: any) => {
+  const httpServer = http.createServer(async (req: any, res: any) => {
+        const url = new URL(req.url || "/", "http://localhost");
 
-    const url = new URL(req.url || "/", "http://localhost");
-            // Health check
-                                                      if (req.method === "GET" && url.pathname === "/health") {
-                                                              res.writeHead(200, { "Content-Type": "application/json" });
-                                                              res.end(JSON.stringify({ status: "ok", server: "regsub-mcp", version: "1.0.0" }));
-                                                              return;
-                                                      }
+                                           // Health check
+                                           if (req.method === "GET" && url.pathname === "/health") {
+                                                   res.writeHead(200, { "Content-Type": "application/json" });
+                                                   res.end(JSON.stringify({ status: "ok", server: "regsub-mcp", version: "1.0.0" }));
+                                                   return;
+                                           }
 
-                                                      // MCP endpoint — handles GET (SSE stream), POST (messages), DELETE (session close)
-                                                      if (url.pathname === "/mcp") {
-                                                              await transport.handleRequest(req, res, await readBody(req));
-                                                              return;
-                                                      }
+                                           // MCP endpoint
+                                           if (url.pathname === "/mcp") {
+                                                   await transport.handleRequest(req, res);
+                                                   return;
+                                           }
 
-                                                      res.writeHead(404, { "Content-Type": "application/json" });
+                                           res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Not found" }));
   });
 
@@ -445,20 +446,6 @@ async function main() {
         console.log("MCP endpoint: http://0.0.0.0:" + PORT + "/mcp");
         console.log("Health check: http://0.0.0.0:" + PORT + "/health");
   });
-}
-
-function readBody(req: any): Promise<any> {
-    return new Promise((resolve) => {
-          let body = "";
-          req.on("data", (chunk: any) => { body += chunk; });
-          req.on("end", () => {
-                  try {
-                            resolve(body ? JSON.parse(body) : undefined);
-                  } catch {
-                            resolve(undefined);
-                  }
-          });
-    });
 }
 
 main().catch(console.error);

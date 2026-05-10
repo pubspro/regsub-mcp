@@ -422,7 +422,8 @@ async function main() {
 
           const httpServer = http.createServer(async (req: any, res: any) => {
 
-                                                      // Health check
+    const url = new URL(req.url || "/", "http://localhost");
+            // Health check
                                                       if (req.method === "GET" && url.pathname === "/health") {
                                                               res.writeHead(200, { "Content-Type": "application/json" });
                                                               res.end(JSON.stringify({ status: "ok", server: "regsub-mcp", version: "1.0.0" }));

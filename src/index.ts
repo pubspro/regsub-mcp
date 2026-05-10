@@ -409,7 +409,6 @@ function createMcpServer(): Server {
 }
 
 // ——— HTTP Server with Streamable HTTP transport ————————————————
-// ——— HTTP Server with Streamable HTTP transport ————————————————
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 
@@ -433,7 +432,15 @@ async function main() {
 
                                            // MCP endpoint
                                            if (url.pathname === "/mcp") {
-                                                   await transport.handleRequest(req, res);
+                                                   try {
+                                                             await transport.handleRequest(req, res);
+                                                   } catch (err: any) {
+                                                             console.error("MCP handleRequest error:", err?.message || String(err));
+                                                             if (!res.headersSent) {
+                                                                         res.writeHead(500, { "Content-Type": "application/json" });
+                                                                         res.end(JSON.stringify({ error: err?.message || "Internal error" }));
+                                                             }
+                                                   }
                                                    return;
                                            }
 

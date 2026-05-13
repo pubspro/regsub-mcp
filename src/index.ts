@@ -1,5 +1,6 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
@@ -411,14 +412,22 @@ function createMcpServer(): Server {
 
 // ——— HTTP Server with Streamable HTTP transport ————————————————
 
+const TRANSPORT = process.env.TRANSPORT ?? (process.env.PORT ? "http" : "stdio");
 const PORT = parseInt(process.env.PORT || "8080", 10);
 
 async function main() {
-    const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => crypto.randomUUID(),
-    });
+    const server = createMcpServer();
 
-  const server = createMcpServer();
+    if (TRANSPORT === "stdio") {
+        const transport = new StdioServerTransport();
+        await server.connect(transport);
+        console.error("regsub-mcp listening on stdio");
+        return;
+    }
+
+    const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+    });
     await server.connect(transport);
 
   const httpServer = http.createServer(async (req: any, res: any) => {
@@ -455,9 +464,9 @@ async function main() {
   });
 
   httpServer.listen(PORT, "0.0.0.0", () => {
-        console.log("Regulatory Submission Intelligence MCP server listening on port " + PORT);
-        console.log("MCP endpoint: http://0.0.0.0:" + PORT + "/mcp");
-        console.log("Health check: http://0.0.0.0:" + PORT + "/health");
+        console.error("Regulatory Submission Intelligence MCP server listening on port " + PORT);
+        console.error("MCP endpoint: http://0.0.0.0:" + PORT + "/mcp");
+        console.error("Health check: http://0.0.0.0:" + PORT + "/health");
   });
 }
 
